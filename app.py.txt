@@ -1,0 +1,59 @@
+from flask import Flask, request
+from twilio.twiml.messaging_response import MessagingResponse
+import anthropic
+import os
+
+app = Flask(__name__)
+
+CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
+
+client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
+
+SYSTEM_PROMPT = """You are a professional English writing assistant.
+The user will send you weak, broken, or informal English.
+Your ONLY job is to rewrite it into polished, professional English.
+
+Rules:
+- Keep the original meaning
+- Make it suitable for professional/formal communication
+- Do NOT explain anything
+- Do NOT add labels or extra text
+- Just return the improved sentence/paragraph only"""
+
+
+@app.route("/whatsapp", methods=["POST"])
+def whatsapp_reply():
+    user_message = request.form.get("Body", "").strip()
+
+    if not user_message:
+        return "No message received", 400
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=500,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {"role": "user", "content": user_message}
+            ]
+        )
+
+        enhanced_text = response.content[0].text.strip()
+
+        reply = f"✅ *Professional English:*\n\n{enhanced_text}\n\n_Copy & send this_ 👆"
+
+    except Exception as e:
+        reply = "❌ Sorry, something went wrong. Please try again."
+
+    twilio_response = MessagingResponse()
+    twilio_response.message(reply)
+    return str(twilio_response)
+
+
+@app.route("/", methods=["GET"])
+def home():
+    return "✅ WhatsApp English Bot is running!"
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
