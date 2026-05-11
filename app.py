@@ -1,12 +1,11 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import google.generativeai as genai
+from google import genai
 import os
 
 app = Flask(__name__)
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
@@ -14,14 +13,15 @@ def whatsapp_reply():
     if not user_message:
         return "No message", 400
     try:
-        response = model.generate_content(
-            f"Rewrite this in professional English. Only return the improved version, nothing else: {user_message}"
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=f"Rewrite this in professional English. Only return the improved version, nothing else: {user_message}"
         )
         enhanced = response.text.strip()
         reply = f"✅ *Professional English:*\n\n{enhanced}\n\n_Copy & send this_ 👆"
     except Exception as e:
-        reply = "❌ Something went wrong. Try again."
-    
+        reply = f"❌ Error: {str(e)}"
+
     twilio_response = MessagingResponse()
     twilio_response.message(reply)
     return str(twilio_response)
